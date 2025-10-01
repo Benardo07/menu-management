@@ -1,14 +1,15 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore } from '@reduxjs/toolkit';
+import menusReducer from './slices/menu-slice';
 
-
-export const makeStore = () => {
-  return configureStore({
+export const makeStore = () =>
+  configureStore({
     reducer: {
-
+      menus: menusReducer,
     },
   });
-};
 
-export type AppStore = ReturnType<typeof makeStore>;
-export type RootState = ReturnType<AppStore["getState"]>;
-export type AppDispatch = AppStore["dispatch"];
+export const store = makeStore();
+
+export type AppStore = typeof store;
+export type RootState = ReturnType<AppStore['getState']>;
+export type AppDispatch = AppStore['dispatch'];
