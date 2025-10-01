@@ -1,113 +1,145 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
-import {
-  Menu,
-  Folder,
-  Layers,
-  ListTree,
-  Users2,
-  Shield,
-  ChevronRight,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { selectItem, selectMenu } from "@/lib/redux/slices/menu-slice";
 
-const menuIcons = [Layers, Users2, Shield];
+interface SidebarGroup {
+  id: string;
+  title: string;
+  children: Array<{ id: string; title: string }>;
+}
+
+const LOGO_SRC = "/logo.png";
+const MENU_TOGGLE_SRC = "/menu_open.png";
+const FOLDER_SRC = "/folder.svg";
+const SUBMENU_SRC = "/submenu.svg";
 
 export function AppSidebar() {
   const [open, setOpen] = useState(false);
   const menus = useAppSelector((state) => state.menus);
   const dispatch = useAppDispatch();
 
-  const groupedMenus = useMemo(
-    () =>
-      menus.list.map((menu, index) => ({
-        id: menu.id,
-        name: menu.name,
-        items: menu.rootItem?.children ?? [],
-        icon: menuIcons[index % menuIcons.length] ?? Layers,
-      })),
-    [menus.list],
-  );
+  const selectedMenu = menus.selectedMenuId ? menus.entities[menus.selectedMenuId] : null;
+  const selectedItemId = menus.selectedItemId ?? null;
 
-  const handleItemClick = (menuId: string, itemId: string | null) => {
-    dispatch(selectMenu(menuId));
-    if (itemId) {
-      dispatch(selectItem(itemId));
+  const groups = useMemo<SidebarGroup[]>(() => {
+    if (!selectedMenu?.rootItem) {
+      return [];
     }
+
+    const levelOne = selectedMenu.rootItem.children ?? [];
+    const result: SidebarGroup[] = [];
+
+    levelOne.forEach((section) => {
+      (section.children ?? []).forEach((child) => {
+        result.push({
+          id: child.id,
+          title: child.title,
+          children: child.children?.map((grandChild) => ({
+            id: grandChild.id,
+            title: grandChild.title,
+          })) ?? [],
+        });
+      });
+    });
+
+    return result;
+  }, [selectedMenu]);
+
+  const activeGroupId = useMemo(() => {
+    if (!selectedItemId) return null;
+    for (const group of groups) {
+      if (group.id === selectedItemId) {
+        return group.id;
+      }
+      if (group.children.some((child) => child.id === selectedItemId)) {
+        return group.id;
+      }
+    }
+    return null;
+  }, [groups, selectedItemId]);
+
+  const handleGroupClick = (group: SidebarGroup) => {
+    if (!selectedMenu) return;
+    if (menus.selectedMenuId !== selectedMenu.id) {
+      dispatch(selectMenu(selectedMenu.id));
+    }
+    dispatch(selectItem(group.id));
+    setOpen(false);
+  };
+
+  const handleChildClick = (group: SidebarGroup, childId: string) => {
+    if (!selectedMenu) return;
+    if (menus.selectedMenuId !== selectedMenu.id) {
+      dispatch(selectMenu(selectedMenu.id));
+    }
+    dispatch(selectItem(childId));
     setOpen(false);
   };
 
   const SidebarBody = (
     <aside
-      aria-label="Main"
-      className="flex h-full w-72 flex-col gap-6 bg-[#0b1323] p-4 text-slate-200 md:gap-8 md:p-6"
+      aria-label="Main navigation"
+      className="flex h-full w-72 flex-col gap-6 bg-[#0b1323] p-4 text-slate-100 md:gap-8 md:p-6"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-slate-800 text-white shadow-inner">
-            <ListTree className="h-4 w-4" />
-          </div>
-          <span className="text-lg font-semibold tracking-wide">CLOIT</span>
+          <Image src={LOGO_SRC} alt="CLOIT" width={64} height={32} className="h-8 w-24 rounded-lg" />
         </div>
         <button
           className="md:hidden inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:bg-white/5"
           onClick={() => setOpen(false)}
           aria-label="Close sidebar"
         >
-          <ChevronRight className="h-5 w-5 rotate-180" />
+          <Image src={MENU_TOGGLE_SRC} alt="Close menu" width={20} height={20} className="rotate-180" />
         </button>
       </div>
 
-      <nav className="space-y-6">
-        {groupedMenus.length === 0 ? (
-          <p className="px-2 text-sm text-slate-400">No menus available yet.</p>
+      <nav className="space-y-4">
+        {groups.length === 0 ? (
+          <p className="px-2 text-sm text-slate-400">Select a menu to view its sections.</p>
         ) : (
-          groupedMenus.map((group) => {
-            const Icon = group.icon ?? Layers;
+          groups.map((group) => {
+            const isActiveGroup = activeGroupId === group.id;
             return (
               <div key={group.id}>
-                <p className="mb-2 flex items-center gap-2 px-2 text-xs uppercase tracking-wider text-slate-400">
-                  <Icon className="h-4 w-4 text-slate-500" />
-                  {group.name}
-                </p>
-                <ul className="space-y-1">
-                  {group.items.length === 0 ? (
-                    <li className="flex items-center gap-2 rounded-lg px-2 py-2 text-slate-400">
-                      <Folder className="h-4 w-4" /> <span>Empty</span>
-                    </li>
-                  ) : (
-                    group.items.map((item) => {
-                      const isActive = menus.selectedMenuId === group.id && menus.selectedItemId === item.id;
+                <button
+                  type="button"
+                  onClick={() => handleGroupClick(group)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition",
+                    isActiveGroup ? "bg-lime-400 text-slate-900" : "text-slate-200 hover:bg-white/10",
+                  )}
+                >
+                  <Image src={FOLDER_SRC} alt="Folder" width={16} height={16} />
+                  <span>{group.title}</span>
+                </button>
+
+                {group.children.length > 0 && (
+                  <ul className="mt-2 space-y-1 pl-10 text-sm text-slate-300">
+                    {group.children.map((child) => {
+                      const isActiveChild = selectedItemId === child.id;
                       return (
-                        <li key={item.id}>
+                        <li key={child.id}>
                           <button
                             type="button"
-                            onClick={() => handleItemClick(group.id, item.id)}
+                            onClick={() => handleChildClick(group, child.id)}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition",
-                              isActive
-                                ? "bg-lime-400 text-slate-900"
-                                : "text-slate-300 hover:bg-white/5 hover:text-white",
+                              "flex w-full items-center gap-3 rounded-lg px-3 py-2 transition",
+                              isActiveChild ? "bg-white/15 text-white" : "hover:bg-white/5",
                             )}
-                            aria-current={isActive ? "page" : undefined}
                           >
-                            <span
-                              className={cn(
-                                "inline-block h-2 w-2 rounded-full",
-                                isActive ? "bg-slate-900/70" : "bg-slate-600",
-                              )}
-                              aria-hidden
-                            />
-                            {item.title}
+                            <Image src={SUBMENU_SRC} alt="Sub menu" width={14} height={14} />
+                            <span>{child.title}</span>
                           </button>
                         </li>
                       );
-                    })
-                  )}
-                </ul>
+                    })}
+                  </ul>
+                )}
               </div>
             );
           })
@@ -115,7 +147,7 @@ export function AppSidebar() {
       </nav>
 
       <div className="mt-auto rounded-xl bg-gradient-to-b from-slate-900 to-slate-950 p-4 text-xs text-slate-400 ring-1 ring-white/5">
-        <p>Sidebar renders the current menu tree so you can jump between top-level sections.</p>
+        <p>Use the sidebar to jump between sections of the active menu.</p>
       </div>
     </aside>
   );
@@ -129,7 +161,7 @@ export function AppSidebar() {
         onClick={() => setOpen(true)}
         aria-label="Open sidebar"
       >
-        <Menu className="h-5 w-5" />
+        <Image src={MENU_TOGGLE_SRC} alt="Open menu" width={20} height={20} />
       </button>
 
       {open && (
@@ -141,3 +173,4 @@ export function AppSidebar() {
     </>
   );
 }
+

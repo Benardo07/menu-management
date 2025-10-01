@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Dot, Folder, ChevronRight } from "lucide-react";
+import { useParams } from "next/navigation";
 import { TopBar } from "@/components/layout/top-bar";
 import { TreeView, type TreeNode } from "@/components/tree/tree-view";
 import { MenuForm, type MenuFormValues } from "@/components/menus/menu-form";
 import { Button } from "@/components/ui/button";
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { cn } from "@/lib/utils";
+import { cn, slugify } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
   createMenuItem,
@@ -21,12 +23,26 @@ import {
   updateMenuItem,
 } from "@/lib/redux/slices/menu-slice";
 
+const BASE_CRUMB = "menus";
+const TARGET_SECTION_TITLE = "menus";
+const TARGET_SECTION_TITLE = "menus";
+
 export default function MenusPage() {
   const dispatch = useAppDispatch();
   const menus = useAppSelector((state) => state.menus);
   const { list, entities, selectedMenuId, selectedItemId, loading, saving, error } = menus;
   const [allExpanded, setAllExpanded] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const params = useParams();
+  const menuSlugParam = Array.isArray(params?.menuSlug)
+    ? params?.menuSlug[0]
+    : typeof params?.menuSlug === "string"
+    ? params?.menuSlug
+    : null;
 
   useEffect(() => {
     if (!list.length) {
@@ -44,36 +60,122 @@ export default function MenusPage() {
     setAllExpanded(true);
   }, [selectedMenuId]);
 
+  useEffect(() => {
+    if (!list.length) return;
+
+    const menuQuery = searchParams.get("menu");
+    const itemQuery = searchParams.get("item");
+
+    if (menuQuery && menuQuery !== selectedMenuId) {
+      dispatch(selectMenu(menuQuery));
+    }
+
+    if (itemQuery && itemQuery !== selectedItemId) {
+      dispatch(selectItem(itemQuery));
+    }
+  }, [dispatch, list.length, searchParams, selectedMenuId, selectedItemId]);
+
+  useEffect(() => {
+    if (!selectedMenuId) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    let changed = false;
+
+    if (params.get("menu") !== selectedMenuId) {
+      params.set("menu", selectedMenuId);
+      changed = true;
+    }
+
+    if (selectedItemId) {
+      if (params.get("item") !== selectedItemId) {
+        params.set("item", selectedItemId);
+        changed = true;
+      }
+    } else if (params.has("item")) {
+      params.delete("item");
+      changed = true;
+    }
+
+    if (changed) {
+      const query = params.toString();
+      const target = query ? `${pathname}?${query}` : pathname;
+      router.replace(target, { scroll: false });
+    }
+  }, [selectedMenuId, selectedItemId, router, pathname, searchParams]);
+
   const selectedMenu = selectedMenuId ? entities[selectedMenuId] : null;
 
-  const { treeNodes, nodeById, parentById } = useMemo(() => {
+  const { treeNodes, nodeById, parentById, targetNodeId } = useMemo(() => {
     if (!selectedMenu?.rootItem) {
-      return { treeNodes: [] as TreeNode[], nodeById: new Map<string, MenuTreeNode>(), parentById: new Map<string, string | null>() };
+      return {
+        treeNodes: [] as TreeNode[],
+        nodeById: new Map<string, MenuTreeNode>(),
+        parentById: new Map<string, string | null>(),
+        targetNodeId: null as string | null,
+      };
     }
 
     const nodeMap = new Map<string, MenuTreeNode>();
     const parentMap = new Map<string, string | null>();
+    let menusNodeId: string | null = null;
 
-    const toTreeNode = (item: MenuTreeNode, parentId: string | null): TreeNode => {
+    const toTreeNode = (item: MenuTreeNode, parentId: string | null, level: number): TreeNode => {
       nodeMap.set(item.id, item);
       parentMap.set(item.id, parentId);
+      if (!menusNodeId && item.title.trim().toLowerCase() === TARGET_SECTION_TITLE) {
+        menusNodeId = item.id;
+      }
       return {
         id: item.id,
         label: item.title,
+        depth: level,
         canAdd: true,
         canDelete: !item.isRoot,
+        children: item.children?.map((child) => toTreeNode(child, item.id, level + 1)) ?? [],
         data: { node: item },
-        children: item.children?.map((child) => toTreeNode(child, item.id)) ?? [],
       };
     };
 
-    const rootNode = toTreeNode(selectedMenu.rootItem, null);
-    return { treeNodes: [rootNode], nodeById: nodeMap, parentById: parentMap };
+    const rootNode = toTreeNode(selectedMenu.rootItem, null, 0);
+    return { treeNodes: [rootNode], nodeById: nodeMap, parentById: parentMap, targetNodeId: menusNodeId };
   }, [selectedMenu]);
 
   const selectedItem = selectedItemId ? nodeById.get(selectedItemId) ?? null : selectedMenu?.rootItem ?? null;
   const parentItemId = selectedItem ? parentById.get(selectedItem.id) ?? null : null;
   const parentItem = parentItemId ? nodeById.get(parentItemId) ?? null : null;
+
+  const isMenusSection = useMemo(() => {
+    if (!targetNodeId || !selectedItem) return false;
+    let currentId: string | null = selectedItem.id;
+    while (currentId) {
+      if (currentId === targetNodeId) {
+        return true;
+      }
+      currentId = parentById.get(currentId) ?? null;
+    }
+    return false;
+  }, [targetNodeId, selectedItem, parentById]);
+
+  const breadcrumbSegments = useMemo(() => {
+    if (!selectedMenu?.rootItem) return [BASE_CRUMB];
+
+    const segments: string[] = [];
+
+    if (selectedItem) {
+      let current: MenuTreeNode | null | undefined = selectedItem;
+      while (current) {
+        segments.unshift(current.title);
+        const parentId: string | null = parentById.get(current.id) ?? null;
+        current = parentId ? nodeById.get(parentId) ?? null : null;
+      }
+    } else {
+      segments.push(selectedMenu.rootItem.title);
+    }
+
+    return [BASE_CRUMB, ...segments];
+  }, [selectedMenu, selectedItem, nodeById, parentById]);
+
+  const breadcrumbLabel = breadcrumbSegments.map(formatBreadcrumbLabel).join(" / ");
 
   const handleMenuChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const menuId = event.target.value || null;
@@ -124,8 +226,6 @@ export default function MenusPage() {
           menuId: selectedMenuId,
           itemId: selectedItemId,
           title: values.title,
-          slug: values.slug ?? null,
-          url: values.url ?? null,
         }),
       ).unwrap();
     } catch (err) {
@@ -148,6 +248,19 @@ export default function MenusPage() {
   const isHydrating = loading && !selectedMenu;
   const feedback = localError || error;
 
+  const panelContent = isMenusSection ? (
+    <MenuForm
+      menu={selectedMenu}
+      item={selectedItem}
+      parent={parentItem}
+      saving={saving}
+      onSubmit={handleSaveItem}
+      onDelete={handleDeleteFromForm}
+    />
+  ) : (
+    <ComingSoonPanel title={selectedItem?.title ?? "Coming soon"} />
+  );
+
   return (
     <div className="min-h-dvh bg-white">
       <AppSidebar />
@@ -158,8 +271,7 @@ export default function MenusPage() {
           <header className="mb-6 space-y-6">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <Folder className="h-4 w-4 text-slate-400" aria-hidden />
-              <span className="text-slate-400">/</span>
-              <span className="text-slate-600">Menus</span>
+              <span className="text-slate-600">{breadcrumbLabel}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -199,28 +311,20 @@ export default function MenusPage() {
             <div className="flex items-center gap-3">
               <Button
                 onClick={() => setAllExpanded(true)}
-                className={cn(
-                  "rounded-full px-5",
-                  "bg-slate-900 text-white hover:bg-slate-900/90",
-                )}
+                className={cn("rounded-full px-5", "bg-slate-900 text-white hover:bg-slate-900/90")}
               >
                 Expand All
               </Button>
               <Button
                 onClick={() => setAllExpanded(false)}
                 variant="outline"
-                className={cn(
-                  "rounded-full px-5",
-                  "border-slate-200 text-slate-700 hover:bg-slate-100",
-                )}
+                className={cn("rounded-full px-5", "border-slate-200 text-slate-700 hover:bg-slate-100")}
               >
                 Collapse All
               </Button>
             </div>
 
-            {feedback && (
-              <span className="text-sm text-red-600">{feedback}</span>
-            )}
+            {feedback && <span className="text-sm text-red-600">{feedback}</span>}
           </section>
 
           <div className="grid gap-10 lg:grid-cols-[minmax(320px,1fr)_minmax(320px,480px)]">
@@ -241,16 +345,7 @@ export default function MenusPage() {
               )}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 md:p-6">
-              <MenuForm
-                menu={selectedMenu}
-                item={selectedItem}
-                parent={parentItem}
-                saving={saving}
-                onSubmit={handleSaveItem}
-                onDelete={handleDeleteFromForm}
-              />
-            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 md:p-6">{panelContent}</div>
           </div>
         </div>
       </main>
@@ -269,6 +364,19 @@ function findNewestChild(menu: MenuPayload, parentId: string) {
     node.children?.forEach((child) => stack.push(child));
   }
   return null;
+}
+
+function formatBreadcrumbLabel(label: string) {
+  return label.trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+function ComingSoonPanel({ title }: { title: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 py-16 text-center text-slate-500">
+      <p className="text-lg font-semibold text-slate-700">{title}</p>
+      <p className="max-w-sm text-sm">We are working on this section. Please check back soon.</p>
+    </div>
+  );
 }
 
 function EmptyState() {
@@ -291,5 +399,3 @@ function LoadingState() {
     </div>
   );
 }
-
-

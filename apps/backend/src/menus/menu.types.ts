@@ -3,8 +3,6 @@ export interface MenuTreeNode {
   menuId: string;
   parentId: string | null;
   title: string;
-  slug: string | null;
-  url: string | null;
   order: number;
   depth: number;
   isRoot: boolean;
@@ -16,7 +14,6 @@ export interface MenuTreeNode {
 export interface MenuResponse {
   id: string;
   name: string;
-  slug: string;
   depth: number;
   createdAt: string;
   updatedAt: string;

@@ -12,21 +12,13 @@ export class MenusService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateMenuDto): Promise<MenuResponse> {
-    const slug = await this.generateUniqueMenuSlug(dto.name);
-
     const menuId = await this.prisma.$transaction(async (tx) => {
-      const menu = await tx.menu.create({
-        data: {
-          name: dto.name,
-          slug,
-        },
-      });
+      const menu = await tx.menu.create({ data: { name: dto.name } });
 
       await tx.menuItem.create({
         data: {
           menuId: menu.id,
           title: dto.name,
-          slug,
           isRoot: true,
           order: 0,
         },
@@ -88,31 +80,18 @@ export class MenusService {
       throw new NotFoundException(`Menu ${id} not found`);
     }
 
-    let nextSlug = menu.slug;
-
-    if (dto.name && dto.name !== menu.name) {
-      nextSlug = await this.generateUniqueMenuSlug(dto.name, menu.id);
-    }
-
     await this.prisma.$transaction(async (tx) => {
-      await tx.menu.update({
-        where: { id },
-        data: {
-          ...(dto.name ? { name: dto.name } : {}),
-          ...(nextSlug !== menu.slug ? { slug: nextSlug } : {}),
-        },
-      });
+      if (dto.name && dto.name !== menu.name) {
+        await tx.menu.update({
+          where: { id },
+          data: { name: dto.name },
+        });
 
-      if (dto.name) {
         const root = await tx.menuItem.findFirst({ where: { menuId: id, isRoot: true } });
-
         if (root) {
           await tx.menuItem.update({
             where: { id: root.id },
-            data: {
-              title: dto.name,
-              slug: nextSlug,
-            },
+            data: { title: dto.name },
           });
         }
       }
@@ -125,15 +104,12 @@ export class MenusService {
     const parent = await this.ensureMenuItem(menuId, dto.parentId);
 
     const order = await this.nextOrder(menuId, parent.id);
-    const slug = await this.generateUniqueMenuItemSlug(menuId, dto.slug ?? dto.title);
 
     await this.prisma.menuItem.create({
       data: {
         menuId,
         parentId: parent.id,
         title: dto.title,
-        slug,
-        url: dto.url ?? null,
         order,
       },
     });
@@ -152,11 +128,11 @@ export class MenusService {
     }
 
     if (dto.parentId !== undefined && dto.parentId !== item.parentId) {
-      if (dto.parentId === null) {
-        throw new BadRequestException('Parent cannot be null');
+      if (dto.parentId === itemId) {
+        throw new BadRequestException('Item cannot be its own parent');
       }
 
-      const newParent = await this.ensureMenuItem(menuId, dto.parentId);
+      const newParent = await this.ensureMenuItem(menuId, dto.parentId ?? item.parentId!);
       await this.assertNoCycle(menuId, itemId, newParent.id);
 
       await this.prisma.$transaction(async (tx) => {
@@ -181,25 +157,11 @@ export class MenusService {
       });
     }
 
-    const data: Prisma.MenuItemUpdateInput = {};
-
     if (dto.title) {
-      data.title = dto.title;
-    }
-
-    if (dto.slug !== undefined) {
-      const slugBase = dto.slug ?? dto.title ?? item.title;
-      data.slug = await this.generateUniqueMenuItemSlug(menuId, slugBase, itemId);
-    } else if (dto.title) {
-      data.slug = await this.generateUniqueMenuItemSlug(menuId, dto.title, itemId);
-    }
-
-    if (dto.url !== undefined) {
-      data.url = dto.url ?? null;
-    }
-
-    if (Object.keys(data).length) {
-      await this.prisma.menuItem.update({ where: { id: itemId }, data });
+      await this.prisma.menuItem.update({
+        where: { id: itemId },
+        data: { title: dto.title },
+      });
     }
 
     return this.findOne(menuId);
@@ -232,7 +194,6 @@ export class MenusService {
     return {
       id: menu.id,
       name: menu.name,
-      slug: menu.slug,
       depth,
       createdAt: menu.createdAt.toISOString(),
       updatedAt: menu.updatedAt.toISOString(),
@@ -253,8 +214,6 @@ export class MenusService {
         menuId: item.menuId,
         parentId: item.parentId,
         title: item.title,
-        slug: item.slug,
-        url: item.url,
         order: item.order,
         isRoot: item.isRoot,
         depth: 0,
@@ -266,12 +225,7 @@ export class MenusService {
 
     let root: MenuTreeNode | null = null;
 
-    const sorted = [...items].sort((a, b) => {
-      if ((a.parentId ?? '') !== (b.parentId ?? '')) {
-        return (a.parentId ?? '').localeCompare(b.parentId ?? '');
-      }
-      return a.order - b.order;
-    });
+    const sorted = [...items].sort((a, b) => a.order - b.order);
 
     for (const item of sorted) {
       const node = nodes.get(item.id)!;
@@ -339,51 +293,6 @@ export class MenusService {
     }
   }
 
-  private async generateUniqueMenuSlug(name: string, excludeId?: string): Promise<string> {
-    const base = this.slugify(name);
-    let slug = base;
-    let counter = 1;
-
-    while (true) {
-      const existing = await this.prisma.menu.findFirst({
-        where: {
-          slug,
-          ...(excludeId ? { NOT: { id: excludeId } } : {}),
-        },
-      });
-
-      if (!existing) {
-        return slug;
-      }
-
-      slug = `${base}-${counter}`;
-      counter += 1;
-    }
-  }
-
-  private async generateUniqueMenuItemSlug(menuId: string, value: string, excludeId?: string): Promise<string> {
-    const base = this.slugify(value);
-    let slug = base;
-    let counter = 1;
-
-    while (true) {
-      const existing = await this.prisma.menuItem.findFirst({
-        where: {
-          menuId,
-          slug,
-          ...(excludeId ? { NOT: { id: excludeId } } : {}),
-        },
-      });
-
-      if (!existing) {
-        return slug;
-      }
-
-      slug = `${base}-${counter}`;
-      counter += 1;
-    }
-  }
-
   private async nextOrder(
     menuId: string,
     parentId: string | null,
@@ -395,14 +304,5 @@ export class MenusService {
     });
 
     return (last?.order ?? -1) + 1;
-  }
-
-  private slugify(value: string): string {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .replace(/-{2,}/g, '-');
   }
 }

@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
+import { PrismaClient } from '@prisma/client';
 
 const envPath = resolve(__dirname, '../.env');
 console.log(`Seeding using env file: ${envPath}`);
@@ -9,14 +10,10 @@ if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL not found for seeding');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { PrismaClient } = require('../generated/prisma');
-
 const prisma = new PrismaClient();
 
 async function seedSystemManagementMenu() {
-  const slug = 'system-management';
-  const existing = await prisma.menu.findUnique({ where: { slug } });
+  const existing = await prisma.menu.findFirst({ where: { name: 'System Management' } });
 
   if (existing) {
     await prisma.menu.delete({ where: { id: existing.id } });
@@ -25,7 +22,6 @@ async function seedSystemManagementMenu() {
   const menu = await prisma.menu.create({
     data: {
       name: 'System Management',
-      slug,
     },
   });
 
@@ -33,7 +29,6 @@ async function seedSystemManagementMenu() {
     data: {
       menuId: menu.id,
       title: 'System Management',
-      slug,
       isRoot: true,
       order: 0,
     },
@@ -44,7 +39,6 @@ async function seedSystemManagementMenu() {
       menuId: menu.id,
       parentId: root.id,
       title: 'Systems',
-      slug: 'systems',
       order: 0,
     },
   });
@@ -54,7 +48,6 @@ async function seedSystemManagementMenu() {
       menuId: menu.id,
       parentId: systems.id,
       title: 'System Code',
-      slug: 'system-code',
       order: 0,
     },
   });
@@ -65,14 +58,12 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: systemCode.id,
         title: 'Code Registration',
-        slug: 'code-registration',
         order: 0,
       },
       {
         menuId: menu.id,
         parentId: systemCode.id,
         title: 'Code Registration - 2',
-        slug: 'code-registration-2',
         order: 1,
       },
     ],
@@ -84,51 +75,46 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: systems.id,
         title: 'Properties',
-        slug: 'properties',
         order: 1,
       },
       {
         menuId: menu.id,
         parentId: systems.id,
         title: 'Menus',
-        slug: 'menus',
         order: 2,
       },
       {
         menuId: menu.id,
         parentId: systems.id,
         title: 'API List',
-        slug: 'api-list',
         order: 3,
       },
       {
         menuId: menu.id,
         parentId: systems.id,
         title: 'Users & Groups',
-        slug: 'users-groups',
         order: 4,
       },
     ],
   });
 
-  const menusNode = await prisma.menuItem.findFirst({
-    where: { menuId: menu.id, slug: 'menus' },
+  const menuNode = await prisma.menuItem.findFirst({
+    where: { menuId: menu.id, parentId: systems.id, title: 'Menus' },
   });
 
-  if (menusNode) {
+  if (menuNode) {
     await prisma.menuItem.create({
       data: {
         menuId: menu.id,
-        parentId: menusNode.id,
+        parentId: menuNode.id,
         title: 'Menu Registration',
-        slug: 'menu-registration',
         order: 0,
       },
     });
   }
 
   const apiListNode = await prisma.menuItem.findFirst({
-    where: { menuId: menu.id, slug: 'api-list' },
+    where: { menuId: menu.id, parentId: systems.id, title: 'API List' },
   });
 
   if (apiListNode) {
@@ -138,14 +124,12 @@ async function seedSystemManagementMenu() {
           menuId: menu.id,
           parentId: apiListNode.id,
           title: 'API Registration',
-          slug: 'api-registration',
           order: 0,
         },
         {
           menuId: menu.id,
           parentId: apiListNode.id,
           title: 'API Edit',
-          slug: 'api-edit',
           order: 1,
         },
       ],
@@ -153,7 +137,7 @@ async function seedSystemManagementMenu() {
   }
 
   const usersGroupsNode = await prisma.menuItem.findFirst({
-    where: { menuId: menu.id, slug: 'users-groups' },
+    where: { menuId: menu.id, parentId: systems.id, title: 'Users & Groups' },
   });
 
   if (usersGroupsNode) {
@@ -162,7 +146,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: usersGroupsNode.id,
         title: 'Users',
-        slug: 'users',
         order: 0,
       },
     });
@@ -172,7 +155,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: usersGroupsNode.id,
         title: 'Groups',
-        slug: 'groups',
         order: 1,
       },
     });
@@ -182,7 +164,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: usersGroupsNode.id,
         title: 'Approvals',
-        slug: 'approvals',
         order: 2,
       },
     });
@@ -192,7 +173,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: usersNode.id,
         title: 'User Account Registration',
-        slug: 'user-account-registration',
         order: 0,
       },
     });
@@ -202,7 +182,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: groupsNode.id,
         title: 'User Group Registration',
-        slug: 'user-group-registration',
         order: 0,
       },
     });
@@ -212,7 +191,6 @@ async function seedSystemManagementMenu() {
         menuId: menu.id,
         parentId: approvalsNode.id,
         title: 'Approval Detail',
-        slug: 'approval-detail',
         order: 0,
       },
     });

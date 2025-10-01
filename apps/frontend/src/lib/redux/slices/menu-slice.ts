@@ -5,8 +5,6 @@ export interface MenuTreeNode {
   menuId: string;
   parentId: string | null;
   title: string;
-  slug: string | null;
-  url: string | null;
   order: number;
   depth: number;
   isRoot: boolean;
@@ -18,7 +16,6 @@ export interface MenuTreeNode {
 export interface MenuPayload {
   id: string;
   name: string;
-  slug: string;
   depth: number;
   createdAt: string;
   updatedAt: string;
@@ -46,14 +43,22 @@ const initialState: MenusState = {
 };
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(input, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers || {}),
+      },
+      cache: 'no-store',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Unable to reach the backend API. Ensure the backend is running and BACKEND_API_URL is set.');
+    }
+    throw error;
+  }
 
   const text = await response.text();
   let data: unknown = null;
@@ -87,17 +92,17 @@ export const fetchMenuById = createAsyncThunk<MenuPayload, string>('menus/fetchB
 
 export const createMenuItem = createAsyncThunk<
   MenuPayload,
-  { menuId: string; parentId: string; title: string; url?: string }
->('menus/createItem', async ({ menuId, parentId, title, url }) => {
+  { menuId: string; parentId: string; title: string }
+>('menus/createItem', async ({ menuId, parentId, title }) => {
   return request<MenuPayload>(`/api/menus/${menuId}/items`, {
     method: 'POST',
-    body: JSON.stringify({ parentId, title, url }),
+    body: JSON.stringify({ parentId, title }),
   });
 });
 
 export const updateMenuItem = createAsyncThunk<
   MenuPayload,
-  { menuId: string; itemId: string; title?: string; slug?: string | null; url?: string | null; parentId?: string | null }
+  { menuId: string; itemId: string; title?: string; parentId?: string | null }
 >('menus/updateItem', async ({ menuId, itemId, ...payload }) => {
   return request<MenuPayload>(`/api/menus/${menuId}/items/${itemId}`, {
     method: 'PATCH',

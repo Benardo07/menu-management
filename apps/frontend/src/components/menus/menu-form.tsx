@@ -7,7 +7,6 @@ import type { MenuPayload, MenuTreeNode } from "@/lib/redux/slices/menu-slice";
 
 export type MenuFormValues = {
   title: string;
-  slug?: string | null;
 };
 
 type MenuFormProps = {
@@ -29,13 +28,11 @@ export function MenuForm({ menu, item, parent, saving = false, onSubmit, onDelet
     }
     setValues({
       title: item.title,
-      slug: item.slug ?? "",
     });
   }, [item]);
 
-  const handleChange = (field: keyof MenuFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    setValues((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setValues({ title: event.target.value });
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -44,7 +41,6 @@ export function MenuForm({ menu, item, parent, saving = false, onSubmit, onDelet
 
     onSubmit?.({
       title: values.title.trim(),
-      slug: values.slug && values.slug.trim().length ? values.slug.trim() : null,
     });
   };
 
@@ -66,16 +62,75 @@ export function MenuForm({ menu, item, parent, saving = false, onSubmit, onDelet
         <Field
           label="Name"
           value={values.title}
-          onChange={handleChange("title")}
+          onChange={handleChange}
           placeholder="Item name"
           required
         />
-        <Field
-          label="Slug"
-          value={values.slug ?? ""}
-          onChange={handleChange("slug")}
-          placeholder="auto-generated when left blank"
-        />
       </div>
 
-  ...
+      <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center">
+        <Button
+          type="submit"
+          disabled={!item || saving}
+          className="rounded-full bg-blue-600 px-8 py-6 text-base font-semibold text-white hover:bg-blue-600/90 disabled:opacity-60"
+        >
+          {saving ? "Saving..." : "Save"}
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!item || isRoot || saving}
+          onClick={onDelete}
+          className="rounded-full px-6 py-6 text-base"
+        >
+          Delete
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+type FieldProps = {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  readOnly?: boolean;
+  subtle?: boolean;
+  required?: boolean;
+};
+
+function Field({ label, value, placeholder, onChange, readOnly, subtle, required }: FieldProps) {
+  return (
+    <div className="space-y-2">
+      <label className="text-sm text-slate-600">{label}</label>
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={onChange}
+        readOnly={readOnly}
+        required={required}
+        className={cnFieldClasses({ readOnly, subtle })}
+        aria-readonly={readOnly}
+      />
+    </div>
+  );
+}
+
+function cnFieldClasses({ readOnly, subtle }: { readOnly?: boolean; subtle?: boolean }) {
+  if (readOnly) {
+    return cnBaseInput(
+      subtle ? "bg-slate-100" : "bg-slate-50",
+      "cursor-not-allowed text-slate-700",
+    );
+  }
+  return cnBaseInput("bg-white text-slate-800", "focus:border-slate-300 focus-visible:outline-none");
+}
+
+function cnBaseInput(...classes: string[]) {
+  return [
+    "w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm shadow-sm transition",
+    ...classes,
+  ].join(" ");
+}

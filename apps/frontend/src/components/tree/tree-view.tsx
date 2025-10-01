@@ -1,12 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import folderIcon from "../../../public/folder.svg";
+import submenuIcon from "../../../public/submenu.svg";
 
 export type TreeNode = {
   id: string;
   label: string;
+  depth: number;
   children?: TreeNode[];
   canAdd?: boolean;
   canDelete?: boolean;
@@ -102,6 +106,8 @@ function Node({
 }: NodeProps) {
   const hasChildren = !!node.children?.length;
   const isSelected = selectedId === node.id;
+  const depthLevel = node.depth ?? depth;
+  const hierarchicalIcon = depthLevel >= 2 ? (depthLevel === 2 ? folderIcon : submenuIcon) : null;
 
   const handleSelect = () => {
     onSelect?.(node);
@@ -127,14 +133,6 @@ function Node({
         aria-expanded={hasChildren ? expanded : undefined}
         data-selected={isSelected}
       >
-        <span
-          aria-hidden
-          className={cn(
-            "mr-1 inline-flex h-5 w-5 items-center justify-center rounded-full ring-1 ring-slate-300",
-            "bg-white",
-          )}
-        />
-
         {hasChildren ? (
           <button
             type="button"
@@ -148,12 +146,16 @@ function Node({
             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
         ) : (
-          <span className="inline-flex h-6 w-6 items-center justify-center text-slate-400">.</span>
+          <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center" />
+        )}
+
+        {hierarchicalIcon && (
+          <Image src={hierarchicalIcon} alt="" width={14} height={14} />
         )}
 
         <span className="flex-1 truncate text-left text-slate-700">{node.label}</span>
 
-        {onAdd && node.canAdd !== false && (
+        {onAdd && node.canAdd !== false && isSelected && (
           <button
             type="button"
             onClick={(event) => {
@@ -203,4 +205,10 @@ function Node({
     </li>
   );
 }
+
+
+
+
+
+
 
