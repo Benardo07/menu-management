@@ -29,7 +29,7 @@ A full-stack menu management platform composed of a NestJS + Prisma API and a Ne
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/<your-org>/menu-management.git
+git clone https://github.com/Benardo07/menu-management.git
 cd menu-management
 ```
 
