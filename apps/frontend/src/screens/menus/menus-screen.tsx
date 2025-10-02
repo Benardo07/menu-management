@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronRight, Dot, Folder, Menu as MenuIcon } from "lucide-react";
+import { ChevronRight, Dot, Folder } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { TreeView, type TreeNode } from "@/components/tree/tree-view";
@@ -27,7 +26,6 @@ import { useSidebar } from "@/contexts/sidebar-context";
 import { SubmenuIcon } from "@/components/icons/submenu-icon";
 
 const DEFAULT_NEW_ITEM_TITLE = "New Item";
-const SUBMENU_ICON = "/submenu.svg";
 export type MenusScreenProps = {
   slugSegments?: string[];
   basePath?: string;
@@ -55,6 +53,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   const [editorSelectedItemId, setEditorSelectedItemId] = useState<
     string | null
   >(null);
+  const [currentRootItemId, setCurrentRootItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!list.length) {
@@ -80,7 +79,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
 
   useEffect(() => {
     setAllExpanded(true);
-  }, [selectedMenuId]);
+  }, [selectedMenuId, currentRootItemId]);
 
   const selectedMenu = selectedMenuId ? entities[selectedMenuId] : null;
 
@@ -90,21 +89,23 @@ export function MenusScreen({}: MenusScreenProps = {}) {
         treeNodes: [] as TreeNode[],
         nodeById: new Map<string, MenuTreeNode>(),
         parentById: new Map<string, string | null>(),
+        treeNodeById: new Map<string, TreeNode>(),
       };
     }
 
     const nodeById = new Map<string, MenuTreeNode>();
     const parentById = new Map<string, string | null>();
+    const treeNodeById = new Map<string, TreeNode>();
 
     const toTreeNode = (
       item: MenuTreeNode,
       parentId: string | null,
-      depth: number
+      depth: number,
     ): TreeNode => {
       nodeById.set(item.id, item);
       parentById.set(item.id, parentId);
 
-      return {
+      const treeNode: TreeNode = {
         id: item.id,
         label: item.title,
         depth,
@@ -116,6 +117,10 @@ export function MenusScreen({}: MenusScreenProps = {}) {
             toTreeNode(child, item.id, depth + 1)
           ) ?? [],
       };
+
+      treeNodeById.set(item.id, treeNode);
+
+      return treeNode;
     };
 
     const rootNode = toTreeNode(selectedMenu.rootItem, null, 0);
@@ -124,26 +129,41 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       treeNodes: [rootNode],
       nodeById,
       parentById,
+      treeNodeById,
     };
   }, [selectedMenu]);
 
-  const { treeNodes, nodeById, parentById } = menuMaps;
-
+  const { treeNodes, nodeById, parentById, treeNodeById } = menuMaps;
   const sidebarSelectedItemId = selectedItemId;
+  const defaultRootId = selectedMenu?.rootItem?.id ?? null;
 
   useEffect(() => {
-    const rootId = selectedMenu?.rootItem?.id ?? null;
-    if (!rootId) {
+    if (!defaultRootId) {
+      setCurrentRootItemId(null);
+      return;
+    }
+    setCurrentRootItemId((current) =>
+      current && treeNodeById.get(current) ? current : defaultRootId
+    );
+  }, [defaultRootId, treeNodeById]);
+
+  const resolvedRootNode =
+    (currentRootItemId && treeNodeById.get(currentRootItemId)) ||
+    (defaultRootId && treeNodeById.get(defaultRootId)) ||
+    treeNodes[0] ||
+    null;
+
+  useEffect(() => {
+    if (!resolvedRootNode) {
       setEditorSelectedItemId(null);
       return;
     }
-    setEditorSelectedItemId((current) => {
-      if (current && nodeById.get(current)) {
-        return current;
-      }
-      return rootId;
-    });
-  }, [selectedMenu, nodeById]);
+    setEditorSelectedItemId((current) =>
+      current && treeNodeById.get(current)
+        ? current
+        : resolvedRootNode.children?.[0]?.id ?? resolvedRootNode.id
+    );
+  }, [resolvedRootNode, treeNodeById]);
 
   const selectedItemRaw = editorSelectedItemId
     ? nodeById.get(editorSelectedItemId) ?? null
@@ -156,6 +176,21 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   const breadcrumbItem = sidebarSelectedItemId
     ? nodeById.get(sidebarSelectedItemId) ?? null
     : selectedMenu?.rootItem ?? null;
+
+  const displayNodes = resolvedRootNode ? [resolvedRootNode] : treeNodes;
+
+  const itemOptions = useMemo(() => {
+    if (!selectedMenu?.rootItem) {
+      return [];
+    }
+    const options: { id: string; title: string; depth: number }[] = [];
+    const walk = (node: MenuTreeNode, depth: number) => {
+      options.push({ id: node.id, title: node.title, depth });
+      node.children?.forEach((child) => walk(child, depth + 1));
+    };
+    walk(selectedMenu.rootItem, 0);
+    return options;
+  }, [selectedMenu]);
 
   const duplicateExists = (
     parentId: string | null,
@@ -185,17 +220,26 @@ export function MenusScreen({}: MenusScreenProps = {}) {
     ) {
       return "/";
     }
-    return `/ ${breadcrumbItem.title}`;
+    return `/${breadcrumbItem.title}`;
   }, [breadcrumbItem]);
 
   const handleMenuChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const menuId = event.target.value || null;
     dispatch(selectMenu(menuId));
+    setCurrentRootItemId(null);
+    setEditorSelectedItemId(null);
+    setAllExpanded(false);
   };
 
   const handleSelectNode = (node: TreeNode) => {
     setEditorSelectedItemId(node.id);
     setMobileOpen(false);
+  };
+
+  const handleRootChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value || null;
+    setCurrentRootItemId(value);
+    setAllExpanded(false);
   };
 
   const handleAddNode = async (node: TreeNode) => {
@@ -346,7 +390,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
 
             <div className="flex items-center gap-3">
               <div className="grid h-12 w-12 place-items-center rounded-full bg-[#253BFF] text-white">
-                <SubmenuIcon className="h-6 w6" fill="#FFFFFF" />
+                <SubmenuIcon className="h-6 w-6" fill="#FFFFFF" />
               </div>
               <div>
                 <h1 className="text-2xl  tracking-tight text-slate-900 md:text-3xl font-bold">
@@ -356,20 +400,19 @@ export function MenusScreen({}: MenusScreenProps = {}) {
             </div>
           </header>
 
-          <section className="mb-6 grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-center">
+          <section className="mb-6 grid gap-4 md:grid-cols-[minmax(240px,0.4fr)_minmax(240px,0.4fr)_auto] md:items-center">
             <div className="max-w-sm">
               <label className="mb-2 block text-sm text-slate-600">Menu</label>
               <div className="relative">
                 <select
                   className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-slate-800 shadow-sm outline-none ring-0 transition focus:border-slate-300"
-                  value={selectedMenuId ?? ""}
-                  onChange={handleMenuChange}
-                  disabled={!list.length}
+                  value={currentRootItemId ?? defaultRootId ?? ""}
+                  onChange={handleRootChange}
+                  disabled={!itemOptions.length}
                 >
-                  {!list.length && <option value="">Loading...</option>}
-                  {list.map((menu) => (
-                    <option key={menu.id} value={menu.id}>
-                      {menu.name}
+                  {itemOptions.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {`${item.title}`}
                     </option>
                   ))}
                 </select>
@@ -402,9 +445,9 @@ export function MenusScreen({}: MenusScreenProps = {}) {
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 md:p-6">
               {isHydrating ? (
                 <LoadingState />
-              ) : treeNodes.length ? (
+              ) : displayNodes.length ? (
                 <TreeView
-                  nodes={treeNodes}
+                  nodes={displayNodes}
                   allExpanded={allExpanded}
                   onAdd={handleAddNode}
                   onDelete={handleDeleteNode}
@@ -466,3 +509,4 @@ function LoadingState() {
     </div>
   );
 }
+
