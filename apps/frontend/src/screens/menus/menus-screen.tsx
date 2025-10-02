@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronRight, Dot, Folder } from "lucide-react";
+import { ChevronRight, Folder } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { TreeView, type TreeNode } from "@/components/tree/tree-view";
@@ -10,7 +10,7 @@ import { MenuForm, type MenuFormValues } from "@/components/menus/menu-form";
 import { ComingSoon } from "@/components/coming-soon";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
-import { cn } from "@/lib/utils";
+import { cn, slugify } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
   createMenuItem,
@@ -18,6 +18,7 @@ import {
   fetchMenuById,
   fetchMenus,
   selectMenu,
+  selectItem,
   type MenuPayload,
   type MenuTreeNode,
   updateMenuItem,
@@ -31,7 +32,7 @@ export type MenusScreenProps = {
   basePath?: string;
 };
 
-export function MenusScreen({}: MenusScreenProps = {}) {
+export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps = {}) {
   const dispatch = useAppDispatch();
   const { collapsed } = useSidebar();
   const { showToast } = useToast();
@@ -82,6 +83,8 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   }, [selectedMenuId, currentRootItemId]);
 
   const selectedMenu = selectedMenuId ? entities[selectedMenuId] : null;
+  const normalizedSlugSegments = useMemo(() => (slugSegments ?? []).map((segment) => slugify(segment)), [slugSegments]);
+  const baseBreadcrumb = basePath ? `/${basePath}` : "";
 
   const menuMaps = useMemo(() => {
     if (!selectedMenu?.rootItem) {
@@ -134,6 +137,17 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   }, [selectedMenu]);
 
   const { treeNodes, nodeById, parentById, treeNodeById } = menuMaps;
+  useEffect(() => {
+    if (!normalizedSlugSegments.length || !list.length) {
+      return;
+    }
+
+    const menuSlug = normalizedSlugSegments[0];
+    const targetMenu = list.find((menu) => slugify(menu.name) === menuSlug);
+    if (targetMenu && targetMenu.id !== selectedMenuId) {
+      dispatch(selectMenu(targetMenu.id));
+    }
+  }, [dispatch, list, normalizedSlugSegments, selectedMenuId]);
   const sidebarSelectedItemId = selectedItemId;
   const defaultRootId = selectedMenu?.rootItem?.id ?? null;
 
@@ -152,6 +166,24 @@ export function MenusScreen({}: MenusScreenProps = {}) {
     (defaultRootId && treeNodeById.get(defaultRootId)) ||
     treeNodes[0] ||
     null;
+  useEffect(() => {
+    if (normalizedSlugSegments.length <= 1 || !selectedMenu?.rootItem) {
+      return;
+    }
+
+    const [, ...itemSegments] = normalizedSlugSegments;
+    if (!itemSegments.length) {
+      return;
+    }
+
+    const match = findNodeBySlug(selectedMenu.rootItem, itemSegments);
+    if (!match) {
+      return;
+    }
+
+    setEditorSelectedItemId((current) => (current === match.id ? current : match.id));
+    dispatch(selectItem(match.id));
+  }, [dispatch, normalizedSlugSegments, selectedMenu]);
 
   useEffect(() => {
     if (!resolvedRootNode) {
@@ -213,23 +245,12 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   };
 
   const breadcrumbLabel = useMemo(() => {
-    if (
-      !breadcrumbItem ||
-      breadcrumbItem.isRoot ||
-      (breadcrumbItem.depth ?? 0) <= 2
-    ) {
-      return "/";
+    if (!breadcrumbItem || breadcrumbItem.isRoot || (breadcrumbItem.depth ?? 0) <= 2) {
+      return baseBreadcrumb;
     }
-    return `/ ${breadcrumbItem.title}`;
-  }, [breadcrumbItem]);
+    return `${baseBreadcrumb} / ${breadcrumbItem.title}`;
+  }, [baseBreadcrumb, breadcrumbItem]);
 
-  const handleMenuChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const menuId = event.target.value || null;
-    dispatch(selectMenu(menuId));
-    setCurrentRootItemId(null);
-    setEditorSelectedItemId(null);
-    setAllExpanded(false);
-  };
 
   const handleSelectNode = (node: TreeNode) => {
     setEditorSelectedItemId(node.id);
@@ -376,6 +397,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
           collapsed ? "md:pl-28" : "md:pl-[21rem]"
         )}
       >
+        <TopBar onMenuToggle={() => setMobileOpen((open) => !open)} />
         <div className="mx-auto w-full max-w-[1200px] px-4 py-6 md:px-8 md:py-10">
           <header className="mb-6 space-y-6">
             <nav
@@ -467,6 +489,20 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       </main>
     </div>
   );
+}
+
+function findNodeBySlug(root: MenuTreeNode, segments: string[]): MenuTreeNode | null {
+  if (!segments.length) {
+    return root;
+  }
+
+  const [current, ...rest] = segments;
+  const next = root.children?.find((node) => slugify(node.title) === current);
+  if (!next) {
+    return null;
+  }
+
+  return findNodeBySlug(next, rest);
 }
 
 function findNewestChild(menu: MenuPayload, parentId: string) {

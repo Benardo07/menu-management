@@ -87,13 +87,11 @@ export class MenusService {
           data: { name: dto.name },
         });
 
-        const root = await tx.menuItem.findFirst({ where: { menuId: id, isRoot: true } });
-        if (root) {
-          await tx.menuItem.update({
-            where: { id: root.id },
-            data: { title: dto.name },
-          });
-        }
+        const root = await this.getRootItem(id, tx);
+        await tx.menuItem.update({
+          where: { id: root.id },
+          data: { title: dto.name },
+        });
       }
     });
 
@@ -127,34 +125,41 @@ export class MenusService {
       return this.findOne(menuId);
     }
 
-    if (dto.parentId !== undefined && dto.parentId !== item.parentId) {
-      if (dto.parentId === itemId) {
+    if (dto.parentId !== undefined) {
+      const targetParent =
+        dto.parentId === null
+          ? await this.getRootItem(menuId)
+          : await this.ensureMenuItem(menuId, dto.parentId);
+      const targetParentId = targetParent.id;
+
+      if (targetParentId === itemId) {
         throw new BadRequestException('Item cannot be its own parent');
       }
 
-      const newParent = await this.ensureMenuItem(menuId, dto.parentId ?? item.parentId!);
-      await this.assertNoCycle(menuId, itemId, newParent.id);
+      if (targetParentId !== item.parentId) {
+        await this.assertNoCycle(menuId, itemId, targetParentId);
 
-      await this.prisma.$transaction(async (tx) => {
-        await tx.menuItem.updateMany({
-          where: {
-            menuId,
-            parentId: item.parentId,
-            order: { gt: item.order },
-          },
-          data: { order: { decrement: 1 } },
+        await this.prisma.$transaction(async (tx) => {
+          await tx.menuItem.updateMany({
+            where: {
+              menuId,
+              parentId: item.parentId,
+              order: { gt: item.order },
+            },
+            data: { order: { decrement: 1 } },
+          });
+
+          const order = await this.nextOrder(menuId, targetParentId, tx);
+
+          await tx.menuItem.update({
+            where: { id: itemId },
+            data: {
+              parentId: targetParentId,
+              order,
+            },
+          });
         });
-
-        const order = await this.nextOrder(menuId, newParent.id, tx);
-
-        await tx.menuItem.update({
-          where: { id: itemId },
-          data: {
-            parentId: newParent.id,
-            order,
-          },
-        });
-      });
+      }
     }
 
     if (dto.title) {
@@ -265,6 +270,21 @@ export class MenusService {
     return { root, depth };
   }
 
+  private async getRootItem(
+    menuId: string,
+    client: Prisma.TransactionClient | PrismaClient = this.prisma,
+  ) {
+    const root = await client.menuItem.findFirst({
+      where: { menuId, isRoot: true },
+    });
+
+    if (!root) {
+      throw new NotFoundException(`Root item for menu ${menuId} not found`);
+    }
+
+    return root;
+  }
+
   private async ensureMenuItem(menuId: string, itemId: string) {
     const item = await this.prisma.menuItem.findFirst({ where: { id: itemId, menuId } });
 
@@ -275,21 +295,26 @@ export class MenusService {
     return item;
   }
 
-  private async assertNoCycle(menuId: string, itemId: string, newParentId: string) {
-    let current: MenuItem | null = await this.prisma.menuItem.findFirst({
-      where: { id: newParentId, menuId },
+  private async assertNoCycle(menuId: string, itemId: string, newParentId: string | null) {
+    if (!newParentId) {
+      return;
+    }
+
+    const ancestry = await this.prisma.menuItem.findMany({
+      where: { menuId },
+      select: { id: true, parentId: true },
     });
 
+    const parentById = new Map(ancestry.map((entry) => [entry.id, entry.parentId]));
+
+    let current: string | null = newParentId;
+
     while (current) {
-      if (current.id === itemId) {
+      if (current === itemId) {
         throw new BadRequestException('Cannot move an item inside its descendants');
       }
-      if (!current.parentId) {
-        break;
-      }
-      current = await this.prisma.menuItem.findFirst({
-        where: { id: current.parentId, menuId },
-      });
+
+      current = parentById.get(current) ?? null;
     }
   }
 

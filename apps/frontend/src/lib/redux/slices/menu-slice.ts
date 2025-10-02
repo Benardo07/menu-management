@@ -1,4 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { requestJson } from '@/lib/api';
 
 export interface MenuTreeNode {
   id: string;
@@ -43,16 +44,9 @@ const initialState: MenusState = {
 };
 
 async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  let response: Response;
+  let parsed;
   try {
-    response = await fetch(input, {
-      ...init,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(init?.headers || {}),
-      },
-      cache: 'no-store',
-    });
+    parsed = await requestJson<unknown>(input, init);
   } catch (error) {
     if (error instanceof TypeError) {
       throw new Error('Unable to reach the backend API. Ensure the backend is running and BACKEND_API_URL is set.');
@@ -60,26 +54,17 @@ async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
     throw error;
   }
 
-  const text = await response.text();
-  let data: unknown = null;
-
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch (error) {
-      data = text;
-    }
-  }
-
-  if (!response.ok) {
+  if (!parsed.ok) {
+    const payload = parsed.payload;
     const message =
-      typeof data === 'object' && data && 'message' in (data as Record<string, unknown>)
-        ? String((data as Record<string, unknown>).message)
-        : response.statusText;
+      typeof payload === 'object' && payload && 'message' in (payload as Record<string, unknown>)
+        ? String((payload as Record<string, unknown>).message)
+        : parsed.statusText;
+
     throw new Error(message || 'Request failed');
   }
 
-  return data as T;
+  return parsed.payload as T;
 }
 
 export const fetchMenus = createAsyncThunk<MenuPayload[]>('menus/fetchAll', async () => {

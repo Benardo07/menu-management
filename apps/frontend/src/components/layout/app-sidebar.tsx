@@ -26,7 +26,6 @@ interface SidebarChild {
   title: string;
 }
 
-const SUBMENU_ICON = "/submenu.svg";
 
 interface SidebarGroup {
   id: string;

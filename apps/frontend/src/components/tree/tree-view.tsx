@@ -1,11 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import folderIcon from "../../../public/folder.svg";
-import submenuIcon from "../../../public/submenu.svg";
 
 export type TreeNode = {
   id: string;
@@ -106,7 +103,6 @@ function Node({
 }: NodeProps) {
   const hasChildren = !!node.children?.length;
   const isSelected = selectedId === node.id;
-  const depthLevel = node.depth ?? depth;
 
   const handleSelect = () => {
     onSelect?.(node);
