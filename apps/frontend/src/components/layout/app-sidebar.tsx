@@ -152,7 +152,7 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
       >
         {!collapsed && (
           <span className="text-lg font-semibold tracking-wide text-white">
-            CLOIT
+            <Image src="/logo.png" alt="Logo" width={64} height={32} />
           </span>
         )}
         <div className="flex items-center gap-2">
@@ -194,41 +194,38 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
         ) : (
           groups.map((group) => {
             const isExpanded = expandedGroupIds.includes(group.id);
-            const isActiveGroup = selectedItemId
-              ? group.descendantIds.includes(selectedItemId)
-              : false;
+            const showCard = !collapsed && isExpanded;
+
             return (
-              <div key={group.id}>
+              <div
+                key={group.id}
+                className={cn(
+                  !collapsed && "rounded-3xl p-1 transition-colors",
+                  showCard && "bg-white/5 ring-1 ring-white/10"
+                )}
+              >
                 <button
                   type="button"
                   onClick={() => handleGroupClick(group)}
                   className={cn(
-                    "flex w-full items-center rounded-xl px-3 py-2 text-left font-medium transition",
+                    "flex w-full items-center rounded-2xl px-3 py-2 text-left font-medium transition",
                     collapsed ? "justify-center" : "gap-3",
-                    isActiveGroup
-                      ? "bg-lime-400 text-slate-900"
-                      : "text-slate-200 hover:bg-white/10"
+                    "text-slate-200 hover:text-white"
                   )}
                 >
-                  {!collapsed && (
-                    <ChevronRight
-                      className={cn(
-                        "h-4 w-4 transition-transform",
-                        group.children.length > 0 ? "" : "opacity-0",
-                        isExpanded && "rotate-90"
-                      )}
-                      aria-hidden
-                    />
-                  )}
+                 
                   <FolderIcon
-                    className={cn("h-4 w-4", collapsed ? "" : "text-current")}
+                    className={cn(
+                      "h-4 w-4",
+                      collapsed ? "" : "text-current"
+                    )}
                     aria-hidden
                   />
                   {!collapsed && <span>{group.title}</span>}
                 </button>
 
                 {!collapsed && group.children.length > 0 && isExpanded && (
-                  <ul className="mt-2 space-y-1 pl-8 text-sm text-slate-300">
+                  <ul className="mt-2 space-y-1 px-2 pb-3 text-sm text-slate-200">
                     {group.children.map((child) => {
                       const isActiveChild = selectedItemId === child.id;
                       return (
@@ -237,10 +234,10 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
                             type="button"
                             onClick={() => handleChildClick(child.id)}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-lg px-3 py-2 transition",
+                              "flex w-full items-center gap-3 rounded-xl px-3 py-2 transition",
                               isActiveChild
-                                ? "bg-white/15 text-white"
-                                : "hover:bg-white/5"
+                                ? "bg-lime-400 text-slate-900 shadow-sm"
+                                : "text-slate-200 hover:bg-white/10 hover:text-white"
                             )}
                           >
                             <Image

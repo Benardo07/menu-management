@@ -17,7 +17,6 @@ import {
   deleteMenuItem,
   fetchMenuById,
   fetchMenus,
-  selectItem,
   selectMenu,
   type MenuPayload,
   type MenuTreeNode,
@@ -50,6 +49,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   const [allExpanded, setAllExpanded] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [editorSelectedItemId, setEditorSelectedItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!list.length) {
@@ -122,13 +122,33 @@ export function MenusScreen({}: MenusScreenProps = {}) {
 
   const { treeNodes, nodeById, parentById } = menuMaps;
 
-  const selectedItem = selectedItemId
-    ? nodeById.get(selectedItemId) ?? null
-    : selectedMenu?.rootItem ?? null;
+  const sidebarSelectedItemId = selectedItemId;
+
+  useEffect(() => {
+    const rootId = selectedMenu?.rootItem?.id ?? null;
+    if (!rootId) {
+      setEditorSelectedItemId(null);
+      return;
+    }
+    setEditorSelectedItemId((current) => {
+      if (current && nodeById.get(current)) {
+        return current;
+      }
+      return rootId;
+    });
+  }, [selectedMenu, nodeById]);
+
+  const selectedItemRaw = editorSelectedItemId
+    ? nodeById.get(editorSelectedItemId) ?? null
+    : null;
+  const selectedItem = selectedItemRaw ?? selectedMenu?.rootItem ?? null;
   const parentItemId = selectedItem
     ? parentById.get(selectedItem.id) ?? null
     : null;
   const parentItem = parentItemId ? nodeById.get(parentItemId) ?? null : null;
+  const breadcrumbItem = sidebarSelectedItemId
+    ? nodeById.get(sidebarSelectedItemId) ?? null
+    : selectedMenu?.rootItem ?? null;
 
   const duplicateExists = (
     parentId: string | null,
@@ -152,14 +172,14 @@ export function MenusScreen({}: MenusScreenProps = {}) {
 
   const breadcrumbLabel = useMemo(() => {
     if (
-      !selectedItem ||
-      selectedItem.isRoot ||
-      (selectedItem.depth ?? 0) <= 2
+      !breadcrumbItem ||
+      breadcrumbItem.isRoot ||
+      (breadcrumbItem.depth ?? 0) <= 2
     ) {
       return "/";
     }
-    return `/${selectedItem.title}`;
-  }, [selectedItem]);
+    return `/${breadcrumbItem.title}`;
+  }, [breadcrumbItem]);
 
   const handleMenuChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const menuId = event.target.value || null;
@@ -167,7 +187,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   };
 
   const handleSelectNode = (node: TreeNode) => {
-    dispatch(selectItem(node.id));
+    setEditorSelectedItemId(node.id);
     setMobileOpen(false);
   };
 
@@ -201,7 +221,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       ).unwrap();
       const newestChild = findNewestChild(updatedMenu, node.id);
       if (newestChild) {
-        dispatch(selectItem(newestChild.id));
+        setEditorSelectedItemId(newestChild.id);
       }
       setAllExpanded(true);
     } catch (err) {
@@ -220,14 +240,14 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       await dispatch(
         deleteMenuItem({ menuId: selectedMenuId, itemId: node.id })
       ).unwrap();
-      dispatch(selectItem(fallback ?? null));
+      setEditorSelectedItemId(fallback ?? null);
     } catch (err) {
       setLocalError((err as Error).message);
     }
   };
 
   const handleSaveItem = async (values: MenuFormValues) => {
-    if (!selectedMenuId || !selectedItemId || !selectedItem) return;
+    if (!selectedMenuId || !editorSelectedItemId || !selectedItem) return;
 
     const nextTitle = values.title.trim();
     if (!nextTitle.length) {
@@ -239,8 +259,8 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       return;
     }
 
-    const parentId = parentById.get(selectedItemId) ?? null;
-    if (duplicateExists(parentId, nextTitle, selectedItemId)) {
+    const parentId = parentById.get(editorSelectedItemId) ?? null;
+    if (duplicateExists(parentId, nextTitle, editorSelectedItemId)) {
       showToast({
         title: "Duplicate name",
         description:
@@ -255,7 +275,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       await dispatch(
         updateMenuItem({
           menuId: selectedMenuId,
-          itemId: selectedItemId,
+          itemId: editorSelectedItemId,
           title: nextTitle,
         })
       ).unwrap();
@@ -273,7 +293,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
       await dispatch(
         deleteMenuItem({ menuId: selectedMenuId, itemId: selectedItem.id })
       ).unwrap();
-      dispatch(selectItem(fallback ?? null));
+      setEditorSelectedItemId(fallback ?? null);
     } catch (err) {
       setLocalError((err as Error).message);
     }
@@ -389,7 +409,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
                   onAdd={handleAddNode}
                   onDelete={handleDeleteNode}
                   onSelect={handleSelectNode}
-                  selectedId={selectedItem?.id ?? null}
+                  selectedId={editorSelectedItemId}
                 />
               ) : (
                 <EmptyState />
