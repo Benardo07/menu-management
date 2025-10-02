@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { ChevronRight, Dot, Folder } from "lucide-react";
+import { ChevronRight, Dot, Folder, Menu as MenuIcon } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
 import { TreeView, type TreeNode } from "@/components/tree/tree-view";
@@ -23,8 +24,10 @@ import {
   updateMenuItem,
 } from "@/lib/redux/slices/menu-slice";
 import { useSidebar } from "@/contexts/sidebar-context";
+import { SubmenuIcon } from "@/components/icons/submenu-icon";
 
 const DEFAULT_NEW_ITEM_TITLE = "New Item";
+const SUBMENU_ICON = "/submenu.svg";
 export type MenusScreenProps = {
   slugSegments?: string[];
   basePath?: string;
@@ -49,7 +52,9 @@ export function MenusScreen({}: MenusScreenProps = {}) {
   const [allExpanded, setAllExpanded] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [editorSelectedItemId, setEditorSelectedItemId] = useState<string | null>(null);
+  const [editorSelectedItemId, setEditorSelectedItemId] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!list.length) {
@@ -94,7 +99,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
     const toTreeNode = (
       item: MenuTreeNode,
       parentId: string | null,
-      depth: number,
+      depth: number
     ): TreeNode => {
       nodeById.set(item.id, item);
       parentById.set(item.id, parentId);
@@ -107,7 +112,9 @@ export function MenusScreen({}: MenusScreenProps = {}) {
         canDelete: !item.isRoot,
         data: { node: item },
         children:
-          item.children?.map((child) => toTreeNode(child, item.id, depth + 1)) ?? [],
+          item.children?.map((child) =>
+            toTreeNode(child, item.id, depth + 1)
+          ) ?? [],
       };
     };
 
@@ -178,7 +185,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
     ) {
       return "/";
     }
-    return `/${breadcrumbItem.title}`;
+    return `/ ${breadcrumbItem.title}`;
   }, [breadcrumbItem]);
 
   const handleMenuChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -317,11 +324,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
 
   return (
     <div className="min-h-dvh bg-white">
-      <AppSidebar
-        mobileOpen={mobileOpen}
-        onMobileOpenChange={setMobileOpen}
-      />
-      <TopBar onMenuToggle={() => setMobileOpen(true)} />
+      <AppSidebar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} />
 
       <main
         className={cn(
@@ -342,16 +345,13 @@ export function MenusScreen({}: MenusScreenProps = {}) {
             </nav>
 
             <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 text-white">
-                <Dot className="h-6 w-6" aria-hidden />
+              <div className="grid h-12 w-12 place-items-center rounded-full bg-[#253BFF] text-white">
+                <SubmenuIcon className="h-6 w6" fill="#FFFFFF" />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+                <h1 className="text-2xl  tracking-tight text-slate-900 md:text-3xl font-bold">
                   Menus
                 </h1>
-                <p className="text-sm text-slate-500">
-                  Manage nested navigation structures with ease.
-                </p>
               </div>
             </div>
           </header>
@@ -398,7 +398,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
             )}
           </section>
 
-          <div className="grid gap-10 md:grid-cols-[0.6fr_0.4fr] md:items-start xl:grid-cols-[0.65fr_0.35fr]">
+          <div className="grid gap-10 lg:grid-cols-[0.6fr_0.4fr] lg:items-start xl:grid-cols-[0.65fr_0.35fr]">
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 md:p-6">
               {isHydrating ? (
                 <LoadingState />

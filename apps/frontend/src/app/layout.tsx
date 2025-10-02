@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SidebarProvider } from "@/contexts/sidebar-context";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { ReduxProvider } from "@/lib/redux/provider";
 
-const inter = Inter({
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
   variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const mono = Roboto_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
@@ -27,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} ${mono.variable} antialiased`}>
+      <body className={`${plusJakarta.variable} antialiased`}>
         <ReduxProvider>
           <SidebarProvider>
             <ToastProvider>{children}</ToastProvider>
@@ -37,4 +32,3 @@ export default function RootLayout({
     </html>
   );
 }
-

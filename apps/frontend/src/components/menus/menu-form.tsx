@@ -72,7 +72,7 @@ export function MenuForm({ menu, item, parent, saving = false, onSubmit, onDelet
         <Button
           type="submit"
           disabled={!item || saving}
-          className="rounded-full bg-blue-600 px-8 py-6 text-base font-semibold text-white hover:bg-blue-600/90 disabled:opacity-60"
+          className="rounded-full bg-[#253BFF] px-8 py-6 text-base font-semibold text-white hover:bg-blue-600/90 disabled:opacity-60"
         >
           {saving ? "Saving..." : "Save"}
         </Button>

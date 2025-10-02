@@ -34,7 +34,10 @@ interface SidebarGroup {
   descendantIds: string[];
 }
 
-export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSidebarProps) {
+export function AppSidebar({
+  mobileOpen = false,
+  onMobileOpenChange,
+}: AppSidebarProps) {
   const { collapsed, setCollapsed } = useSidebar();
   const menus = useAppSelector((state) => state.menus);
   const dispatch = useAppDispatch();
@@ -140,7 +143,7 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
     <aside
       aria-label="Main navigation"
       className={cn(
-        "flex h-full flex-col gap-6 text-slate-100 transition-all duration-300",
+        "flex max-h-full max-w-full flex-col gap-6 overflow-y-auto text-[#667085] transition-all duration-300",
         collapsed ? "w-16 px-3 py-4" : "w-72 px-6 py-6"
       )}
     >
@@ -169,7 +172,7 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:bg-white/10"
+            className="hidden h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:bg-white/10 md:inline-flex"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
@@ -213,19 +216,17 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
                     "text-slate-200 hover:text-white"
                   )}
                 >
-                 
                   <FolderIcon
-                    className={cn(
-                      "h-4 w-4",
-                      collapsed ? "" : "text-current"
-                    )}
+                    className={cn("h-6 w-6", collapsed ? "" : "text-current")}
                     aria-hidden
                   />
-                  {!collapsed && <span>{group.title}</span>}
+                  {!collapsed && (
+                    <span className="font-bold text-[14px]">{group.title}</span>
+                  )}
                 </button>
 
                 {!collapsed && group.children.length > 0 && isExpanded && (
-                  <ul className="mt-2 space-y-1 px-2 pb-3 text-sm text-slate-200">
+                  <ul className="mt-2 space-y-1 px-2 pb-3 text-sm text-[#667085]">
                     {group.children.map((child) => {
                       const isActiveChild = selectedItemId === child.id;
                       return (
@@ -237,16 +238,18 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
                               "flex w-full items-center gap-3 rounded-xl px-3 py-2 transition",
                               isActiveChild
                                 ? "bg-lime-400 text-slate-900 shadow-sm"
-                                : "text-slate-200 hover:bg-white/10 hover:text-white"
+                                : "text-[#667085] hover:bg-white/10 hover:text-white"
                             )}
                           >
                             <Image
                               src={SUBMENU_ICON}
                               alt="Sub menu"
-                              width={14}
-                              height={14}
+                              width={24}
+                              height={24}
                             />
-                            <span className="truncate">{child.title}</span>
+                            <span className="truncate font-bold text-[14px]">
+                              {child.title}
+                            </span>
                           </button>
                         </li>
                       );
@@ -285,7 +288,7 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
       <button
         type="button"
         onClick={handleOpenMobile}
-        className="fixed left-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0b1323] text-white shadow-lg ring-1 ring-white/10 md:hidden"
+        className="fixed right-4 top-4 z-40 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0b1323] text-white shadow-lg ring-1 ring-white/10 md:hidden"
         aria-label="Open sidebar"
       >
         <MenuIcon className="h-5 w-5" />
@@ -302,8 +305,8 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSideba
             aria-hidden
             onClick={handleCloseMobile}
           />
-          <div className="absolute inset-y-0 left-0 w-[18rem] p-4">
-            <div className="flex h-full flex-col rounded-2xl bg-[#0b1323] shadow-2xl ring-1 ring-white/5">
+          <div className="absolute inset-y-0 left-0 w-[calc(100vw-2rem)] max-w-[18rem] p-4">
+            <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[#0b1323] shadow-2xl ring-1 ring-white/5">
               {sidebarContent}
             </div>
           </div>

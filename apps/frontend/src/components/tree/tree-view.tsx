@@ -125,7 +125,9 @@ function Node({
         className={cn(
           "relative flex items-center gap-2 rounded-lg py-1 pr-2 transition",
           depth > 0 ? "pl-8" : "pl-1",
-          isSelected ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "hover:bg-slate-50",
+          isSelected
+            ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200"
+            : "hover:bg-slate-50"
         )}
         onClick={handleSelect}
         role="treeitem"
@@ -142,13 +144,22 @@ function Node({
             className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100"
             aria-label={expanded ? "Collapse" : "Expand"}
           >
-            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
           </button>
         ) : (
-          <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center" />
+          <span
+            aria-hidden
+            className="inline-flex h-6 w-6 items-center justify-center"
+          />
         )}
 
-        <span className="flex-1 truncate text-left text-slate-700">{node.label}</span>
+        <span className="flex-1 truncate text-left text-slate-700">
+          {node.label}
+        </span>
 
         {onAdd && node.canAdd !== false && isSelected && (
           <button
@@ -157,7 +168,7 @@ function Node({
               event.stopPropagation();
               onAdd(node);
             }}
-            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white shadow hover:bg-blue-600/90"
+            className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#253BFF] text-white shadow hover:bg-blue-600/90"
             aria-label={`Add under ${node.label}`}
           >
             <Plus className="h-3.5 w-3.5" />
