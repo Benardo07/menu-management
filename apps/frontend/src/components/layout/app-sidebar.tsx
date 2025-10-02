@@ -2,8 +2,13 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Folder as FolderIcon, Menu as MenuIcon, X } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Folder as FolderIcon,
+  Menu as MenuIcon,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { selectItem } from "@/lib/redux/slices/menu-slice";
@@ -13,8 +18,6 @@ import { useSidebar } from "@/contexts/sidebar-context";
 interface AppSidebarProps {
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
-  slugById?: Record<string, string>;
-  baseRoute?: string;
 }
 
 interface SidebarChild {
@@ -31,13 +34,14 @@ interface SidebarGroup {
   descendantIds: string[];
 }
 
-export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, baseRoute = "/menus" }: AppSidebarProps) {
-  const router = useRouter();
+export function AppSidebar({ mobileOpen = false, onMobileOpenChange }: AppSidebarProps) {
   const { collapsed, setCollapsed } = useSidebar();
   const menus = useAppSelector((state) => state.menus);
   const dispatch = useAppDispatch();
 
-  const selectedMenu = menus.selectedMenuId ? menus.entities[menus.selectedMenuId] : null;
+  const selectedMenu = menus.selectedMenuId
+    ? menus.entities[menus.selectedMenuId]
+    : null;
   const selectedItemId = menus.selectedItemId ?? null;
 
   useEffect(() => {
@@ -67,10 +71,11 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
         result.push({
           id: child.id,
           title: child.title,
-          children: child.children?.map((grandChild) => ({
-            id: grandChild.id,
-            title: grandChild.title,
-          })) ?? [],
+          children:
+            child.children?.map((grandChild) => ({
+              id: grandChild.id,
+              title: grandChild.title,
+            })) ?? [],
           descendantIds: gatherDescendants(child),
         });
       });
@@ -86,18 +91,24 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
   }, [selectedMenu?.id]);
 
   useEffect(() => {
-    setExpandedGroupIds((prev) => prev.filter((id) => groups.some((group) => group.id === id)));
+    setExpandedGroupIds((prev) =>
+      prev.filter((id) => groups.some((group) => group.id === id))
+    );
   }, [groups]);
 
   useEffect(() => {
     if (!selectedItemId) {
       return;
     }
-    const containingGroup = groups.find((group) => group.descendantIds.includes(selectedItemId));
+    const containingGroup = groups.find((group) =>
+      group.descendantIds.includes(selectedItemId)
+    );
     if (!containingGroup) {
       return;
     }
-    setExpandedGroupIds((prev) => (prev.includes(containingGroup.id) ? prev : [...prev, containingGroup.id]));
+    setExpandedGroupIds((prev) =>
+      prev.includes(containingGroup.id) ? prev : [...prev, containingGroup.id]
+    );
   }, [groups, selectedItemId]);
 
   const handleCloseMobile = () => {
@@ -115,32 +126,35 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
       return;
     }
     setExpandedGroupIds((prev) =>
-      prev.includes(group.id) ? prev.filter((id) => id !== group.id) : [...prev, group.id],
+      prev.includes(group.id)
+        ? prev.filter((id) => id !== group.id)
+        : [...prev, group.id]
     );
   };
 
   const handleChildClick = (childId: string) => {
     dispatch(selectItem(childId));
-    const slug = slugById?.[childId];
-    if (slug) {
-      router.push(`/${slug}`, { scroll: false });
-    } else if (baseRoute) {
-      router.push(baseRoute, { scroll: false });
-    }
     handleCloseMobile();
   };
-
   const sidebarContent = (
     <aside
       aria-label="Main navigation"
       className={cn(
         "flex h-full flex-col gap-6 text-slate-100 transition-all duration-300",
-        collapsed ? "w-16 px-3 py-4" : "w-72 px-6 py-6",
+        collapsed ? "w-16 px-3 py-4" : "w-72 px-6 py-6"
       )}
     >
-      <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}
->
-        {!collapsed && <span className="text-lg font-semibold tracking-wide text-white">CLOIT</span>}
+      <div
+        className={cn(
+          "flex items-center",
+          collapsed ? "justify-center" : "justify-between"
+        )}
+      >
+        {!collapsed && (
+          <span className="text-lg font-semibold tracking-wide text-white">
+            CLOIT
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {onMobileOpenChange && (
             <button
@@ -158,18 +172,31 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
             className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-300 hover:bg-white/10"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
           </button>
         </div>
       </div>
 
       <nav className="space-y-5 text-sm">
         {groups.length === 0 ? (
-          <p className={cn("text-slate-400", collapsed ? "text-center text-xs" : "px-1")}>Select a menu to view items.</p>
+          <p
+            className={cn(
+              "text-slate-400",
+              collapsed ? "text-center text-xs" : "px-1"
+            )}
+          >
+            Select a menu to view items.
+          </p>
         ) : (
           groups.map((group) => {
             const isExpanded = expandedGroupIds.includes(group.id);
-            const isActiveGroup = selectedItemId ? group.descendantIds.includes(selectedItemId) : false;
+            const isActiveGroup = selectedItemId
+              ? group.descendantIds.includes(selectedItemId)
+              : false;
             return (
               <div key={group.id}>
                 <button
@@ -178,7 +205,9 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
                   className={cn(
                     "flex w-full items-center rounded-xl px-3 py-2 text-left font-medium transition",
                     collapsed ? "justify-center" : "gap-3",
-                    isActiveGroup ? "bg-lime-400 text-slate-900" : "text-slate-200 hover:bg-white/10",
+                    isActiveGroup
+                      ? "bg-lime-400 text-slate-900"
+                      : "text-slate-200 hover:bg-white/10"
                   )}
                 >
                   {!collapsed && (
@@ -186,12 +215,15 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
                       className={cn(
                         "h-4 w-4 transition-transform",
                         group.children.length > 0 ? "" : "opacity-0",
-                        isExpanded && "rotate-90",
+                        isExpanded && "rotate-90"
                       )}
                       aria-hidden
                     />
                   )}
-                  <FolderIcon className={cn("h-4 w-4", collapsed ? "" : "text-current")} aria-hidden />
+                  <FolderIcon
+                    className={cn("h-4 w-4", collapsed ? "" : "text-current")}
+                    aria-hidden
+                  />
                   {!collapsed && <span>{group.title}</span>}
                 </button>
 
@@ -206,10 +238,17 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
                             onClick={() => handleChildClick(child.id)}
                             className={cn(
                               "flex w-full items-center gap-3 rounded-lg px-3 py-2 transition",
-                              isActiveChild ? "bg-white/15 text-white" : "hover:bg-white/5",
+                              isActiveChild
+                                ? "bg-white/15 text-white"
+                                : "hover:bg-white/5"
                             )}
                           >
-                            <Image src={SUBMENU_ICON} alt="Sub menu" width={14} height={14} />
+                            <Image
+                              src={SUBMENU_ICON}
+                              alt="Sub menu"
+                              width={14}
+                              height={14}
+                            />
                             <span className="truncate">{child.title}</span>
                           </button>
                         </li>
@@ -236,11 +275,13 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
       <div
         className={cn(
           "fixed inset-y-0 left-0 hidden md:block transition-all duration-300",
-          collapsed ? "w-24" : "w-72",
+          collapsed ? "w-24" : "w-72"
         )}
       >
         <div className="flex h-full flex-col p-4">
-          <div className="flex h-full rounded-2xl bg-[#0b1323] shadow-2xl ring-1 ring-white/5">{sidebarContent}</div>
+          <div className="flex h-full rounded-2xl bg-[#0b1323] shadow-2xl ring-1 ring-white/5">
+            {sidebarContent}
+          </div>
         </div>
       </div>
 
@@ -254,8 +295,16 @@ export function AppSidebar({ mobileOpen = false, onMobileOpenChange, slugById, b
       </button>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-          <div className="absolute inset-0 bg-black/40" aria-hidden onClick={handleCloseMobile} />
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-black/40"
+            aria-hidden
+            onClick={handleCloseMobile}
+          />
           <div className="absolute inset-y-0 left-0 w-[18rem] p-4">
             <div className="flex h-full flex-col rounded-2xl bg-[#0b1323] shadow-2xl ring-1 ring-white/5">
               {sidebarContent}

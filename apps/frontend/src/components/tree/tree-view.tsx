@@ -107,7 +107,6 @@ function Node({
   const hasChildren = !!node.children?.length;
   const isSelected = selectedId === node.id;
   const depthLevel = node.depth ?? depth;
-  const hierarchicalIcon = depthLevel >= 2 ? (depthLevel === 2 ? folderIcon : submenuIcon) : null;
 
   const handleSelect = () => {
     onSelect?.(node);
@@ -147,10 +146,6 @@ function Node({
           </button>
         ) : (
           <span aria-hidden className="inline-flex h-6 w-6 items-center justify-center" />
-        )}
-
-        {hierarchicalIcon && (
-          <Image src={hierarchicalIcon} alt="" width={14} height={14} />
         )}
 
         <span className="flex-1 truncate text-left text-slate-700">{node.label}</span>

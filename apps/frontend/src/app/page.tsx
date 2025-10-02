@@ -23,11 +23,19 @@ export default function Home() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <AppSidebar mobileOpen={isMobileSidebarOpen} onMobileOpenChange={setMobileSidebarOpen} />
+      <AppSidebar
+        mobileOpen={isMobileSidebarOpen}
+        onMobileOpenChange={setMobileSidebarOpen}
+      />
       <TopBar onMenuToggle={() => setMobileSidebarOpen(true)} />
 
-      <main className={cn("transition-all duration-300", collapsed ? "md:pl-28" : "md:pl-[21rem]")}>
-        <div className="mx-auto w-full max-w-[1200px] px-4 py-12 md:px-8">
+      <main
+        className={cn(
+          "transition-all duration-300",
+          collapsed ? "md:pl-28" : "md:pl-[21rem]"
+        )}
+      >
+        <div className="w-full max-w-[1200px] px-4 py-12 md:px-8">
           <ComingSoon description="Select a section from the sidebar. Additional pages will arrive soon." />
         </div>
       </main>

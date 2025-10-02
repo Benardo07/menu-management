@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { ChevronRight, Dot, Folder } from "lucide-react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { TopBar } from "@/components/layout/top-bar";
@@ -11,7 +10,7 @@ import { MenuForm, type MenuFormValues } from "@/components/menus/menu-form";
 import { ComingSoon } from "@/components/coming-soon";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
-import { cn, slugify } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import {
   createMenuItem,
@@ -32,22 +31,25 @@ export type MenusScreenProps = {
   basePath?: string;
 };
 
-export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
+export function MenusScreen({}: MenusScreenProps = {}) {
   const dispatch = useAppDispatch();
-  const router = useRouter();
-  const pathname = usePathname();
   const { collapsed } = useSidebar();
   const { showToast } = useToast();
 
   const menus = useAppSelector((state) => state.menus);
-  const { list, entities, selectedMenuId, selectedItemId, loading, saving, error } = menus;
+  const {
+    list,
+    entities,
+    selectedMenuId,
+    selectedItemId,
+    loading,
+    saving,
+    error,
+  } = menus;
 
   const [allExpanded, setAllExpanded] = useState(true);
   const [localError, setLocalError] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const baseRoute = basePath ? `/${basePath}` : "/menus";
-  const activeSlug = slugSegments[slugSegments.length - 1]?.toLowerCase() ?? null;
 
   useEffect(() => {
     if (!list.length) {
@@ -83,40 +85,19 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
         treeNodes: [] as TreeNode[],
         nodeById: new Map<string, MenuTreeNode>(),
         parentById: new Map<string, string | null>(),
-        slugById: new Map<string, string>(),
-        slugToId: new Map<string, string>(),
       };
     }
 
     const nodeById = new Map<string, MenuTreeNode>();
     const parentById = new Map<string, string | null>();
-    const slugById = new Map<string, string>();
-    const slugToId = new Map<string, string>();
-    const usedSlugs = new Set<string>();
-    const ensureUniqueSlug = (title: string, fallback: string) => {
-      const base = (title || fallback || "item").toLowerCase();
-      let slug = slugify(base);
-      if (!slug) {
-        slug = fallback.toLowerCase() || "item";
-      }
-      let suffix = 2;
-      let candidate = slug;
-      while (usedSlugs.has(candidate)) {
-        candidate = `${slug}-${suffix++}`;
-      }
-      usedSlugs.add(candidate);
-      return candidate;
-    };
 
-    const toTreeNode = (item: MenuTreeNode, parentId: string | null, depth: number): TreeNode => {
+    const toTreeNode = (
+      item: MenuTreeNode,
+      parentId: string | null,
+      depth: number,
+    ): TreeNode => {
       nodeById.set(item.id, item);
       parentById.set(item.id, parentId);
-
-      if (!item.isRoot) {
-        const slug = ensureUniqueSlug(item.title, item.id.slice(0, 6));
-        slugById.set(item.id, slug);
-        slugToId.set(slug, item.id);
-      }
 
       return {
         id: item.id,
@@ -125,7 +106,8 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
         canAdd: true,
         canDelete: !item.isRoot,
         data: { node: item },
-        children: item.children?.map((child) => toTreeNode(child, item.id, depth + 1)) ?? [],
+        children:
+          item.children?.map((child) => toTreeNode(child, item.id, depth + 1)) ?? [],
       };
     };
 
@@ -135,66 +117,45 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
       treeNodes: [rootNode],
       nodeById,
       parentById,
-      slugById,
-      slugToId
     };
   }, [selectedMenu]);
 
-  const { treeNodes, nodeById, parentById, slugById, slugToId } = menuMaps;
+  const { treeNodes, nodeById, parentById } = menuMaps;
 
-  const sidebarSlugMap = useMemo(() => {
-    const result: Record<string, string> = {};
-    slugById.forEach((value, key) => {
-      result[key] = value;
-    });
-    return result;
-  }, [slugById]);
-
-  const selectedItem = selectedItemId ? nodeById.get(selectedItemId) ?? null : selectedMenu?.rootItem ?? null;
-  const parentItemId = selectedItem ? parentById.get(selectedItem.id) ?? null : null;
+  const selectedItem = selectedItemId
+    ? nodeById.get(selectedItemId) ?? null
+    : selectedMenu?.rootItem ?? null;
+  const parentItemId = selectedItem
+    ? parentById.get(selectedItem.id) ?? null
+    : null;
   const parentItem = parentItemId ? nodeById.get(parentItemId) ?? null : null;
-  const selectedItemSlug = selectedItem ? slugById.get(selectedItem.id) ?? null : null;
 
-  useEffect(() => {
-    if (!activeSlug) {
-      return;
-    }
-    const targetId = slugToId.get(activeSlug);
-    if (targetId && targetId !== selectedItemId) {
-      dispatch(selectItem(targetId));
-    }
-  }, [activeSlug, slugToId, dispatch, selectedItemId]);
-
-  useEffect(() => {
-    if (!selectedItem) {
-      return;
-    }
-
-    if ((selectedItem.depth ?? 0) <= 2 || !selectedItemSlug) {
-      if (pathname !== baseRoute) {
-        router.push(baseRoute, { scroll: false });
-      }
-      return;
-    }
-
-    const targetPath = `/${selectedItemSlug}`;
-    if (pathname !== targetPath) {
-      router.push(targetPath, { scroll: false });
-    }
-  }, [selectedItem, selectedItemSlug, pathname, router, baseRoute]);
-
-  const duplicateExists = (parentId: string | null, title: string, excludeId?: string) => {
+  const duplicateExists = (
+    parentId: string | null,
+    title: string,
+    excludeId?: string
+  ) => {
     const normalized = title.trim().toLowerCase();
     if (!normalized) {
       return false;
     }
-    const parentNode = parentId ? nodeById.get(parentId) : selectedMenu?.rootItem ?? null;
+    const parentNode = parentId
+      ? nodeById.get(parentId)
+      : selectedMenu?.rootItem ?? null;
     const siblings = parentNode?.children ?? [];
-    return siblings.some((child) => child.id !== excludeId && child.title.trim().toLowerCase() === normalized);
+    return siblings.some(
+      (child) =>
+        child.id !== excludeId &&
+        child.title.trim().toLowerCase() === normalized
+    );
   };
 
   const breadcrumbLabel = useMemo(() => {
-    if (!selectedItem || selectedItem.isRoot || (selectedItem.depth ?? 0) <= 2) {
+    if (
+      !selectedItem ||
+      selectedItem.isRoot ||
+      (selectedItem.depth ?? 0) <= 2
+    ) {
       return "/";
     }
     return `/${selectedItem.title}`;
@@ -214,7 +175,13 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
     if (!selectedMenuId) return;
 
     const siblings = node.children ?? [];
-    if (siblings.some((child) => child.label.trim().toLowerCase() === DEFAULT_NEW_ITEM_TITLE.toLowerCase())) {
+    if (
+      siblings.some(
+        (child) =>
+          child.label.trim().toLowerCase() ===
+          DEFAULT_NEW_ITEM_TITLE.toLowerCase()
+      )
+    ) {
       showToast({
         title: "Duplicate name",
         description: `A submenu named "${DEFAULT_NEW_ITEM_TITLE}" already exists here. Rename it before adding another.`,
@@ -226,7 +193,11 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
     setLocalError(null);
     try {
       const updatedMenu = await dispatch(
-        createMenuItem({ menuId: selectedMenuId, parentId: node.id, title: DEFAULT_NEW_ITEM_TITLE }),
+        createMenuItem({
+          menuId: selectedMenuId,
+          parentId: node.id,
+          title: DEFAULT_NEW_ITEM_TITLE,
+        })
       ).unwrap();
       const newestChild = findNewestChild(updatedMenu, node.id);
       if (newestChild) {
@@ -243,9 +214,12 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
       return;
     }
     setLocalError(null);
-    const fallback = parentById.get(node.id) ?? selectedMenu?.rootItem?.id ?? null;
+    const fallback =
+      parentById.get(node.id) ?? selectedMenu?.rootItem?.id ?? null;
     try {
-      await dispatch(deleteMenuItem({ menuId: selectedMenuId, itemId: node.id })).unwrap();
+      await dispatch(
+        deleteMenuItem({ menuId: selectedMenuId, itemId: node.id })
+      ).unwrap();
       dispatch(selectItem(fallback ?? null));
     } catch (err) {
       setLocalError((err as Error).message);
@@ -257,7 +231,11 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
 
     const nextTitle = values.title.trim();
     if (!nextTitle.length) {
-      showToast({ title: "Name required", description: "Please enter a menu name before saving.", variant: "error" });
+      showToast({
+        title: "Name required",
+        description: "Please enter a menu name before saving.",
+        variant: "error",
+      });
       return;
     }
 
@@ -265,7 +243,8 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
     if (duplicateExists(parentId, nextTitle, selectedItemId)) {
       showToast({
         title: "Duplicate name",
-        description: "Another submenu with this name already exists in this folder.",
+        description:
+          "Another submenu with this name already exists in this folder.",
         variant: "error",
       });
       return;
@@ -278,7 +257,7 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
           menuId: selectedMenuId,
           itemId: selectedItemId,
           title: nextTitle,
-        }),
+        })
       ).unwrap();
     } catch (err) {
       setLocalError((err as Error).message);
@@ -288,9 +267,12 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
   const handleDeleteFromForm = async () => {
     if (!selectedMenuId || !selectedItem || selectedItem.isRoot) return;
     setLocalError(null);
-    const fallback = parentById.get(selectedItem.id) ?? selectedMenu?.rootItem?.id ?? null;
+    const fallback =
+      parentById.get(selectedItem.id) ?? selectedMenu?.rootItem?.id ?? null;
     try {
-      await dispatch(deleteMenuItem({ menuId: selectedMenuId, itemId: selectedItem.id })).unwrap();
+      await dispatch(
+        deleteMenuItem({ menuId: selectedMenuId, itemId: selectedItem.id })
+      ).unwrap();
       dispatch(selectItem(fallback ?? null));
     } catch (err) {
       setLocalError((err as Error).message);
@@ -315,15 +297,28 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
 
   return (
     <div className="min-h-dvh bg-white">
-      <AppSidebar mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} slugById={sidebarSlugMap} baseRoute={baseRoute} />
+      <AppSidebar
+        mobileOpen={mobileOpen}
+        onMobileOpenChange={setMobileOpen}
+      />
       <TopBar onMenuToggle={() => setMobileOpen(true)} />
 
-      <main className={cn("transition-all duration-300", collapsed ? "md:pl-28" : "md:pl-[21rem]") }>
+      <main
+        className={cn(
+          "transition-all duration-300",
+          collapsed ? "md:pl-28" : "md:pl-[21rem]"
+        )}
+      >
         <div className="mx-auto w-full max-w-[1200px] px-4 py-6 md:px-8 md:py-10">
           <header className="mb-6 space-y-6">
-            <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm text-slate-500">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex items-center gap-2 text-sm text-slate-500"
+            >
               <Folder className="h-4 w-4 text-slate-400" aria-hidden />
-              <span className="flex items-center gap-2 text-slate-600">{breadcrumbLabel}</span>
+              <span className="flex items-center gap-2 text-slate-600">
+                {breadcrumbLabel}
+              </span>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -331,8 +326,12 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
                 <Dot className="h-6 w-6" aria-hidden />
               </div>
               <div>
-                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">Menus</h1>
-                <p className="text-sm text-slate-500">Manage nested navigation structures with ease.</p>
+                <h1 className="text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+                  Menus
+                </h1>
+                <p className="text-sm text-slate-500">
+                  Manage nested navigation structures with ease.
+                </p>
               </div>
             </div>
           </header>
@@ -374,10 +373,12 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
               </Button>
             </div>
 
-            {feedback && <span className="text-sm text-red-600">{feedback}</span>}
+            {feedback && (
+              <span className="text-sm text-red-600">{feedback}</span>
+            )}
           </section>
 
-          <div className="grid gap-10 lg:grid-cols-[minmax(320px,1fr)_minmax(320px,480px)]">
+          <div className="grid gap-10 md:grid-cols-[0.6fr_0.4fr] md:items-start xl:grid-cols-[0.65fr_0.35fr]">
             <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-4 md:p-6">
               {isHydrating ? (
                 <LoadingState />
@@ -395,7 +396,9 @@ export function MenusScreen({ slugSegments = [], basePath }: MenusScreenProps) {
               )}
             </div>
 
-            <div className="rounded-3xl border border-slate-200 bg-white p-4 md:p-6">{panelContent}</div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-4 md:p-6">
+              {panelContent}
+            </div>
           </div>
         </div>
       </main>
@@ -409,7 +412,10 @@ function findNewestChild(menu: MenuPayload, parentId: string) {
     const node = stack.pop()!;
     if (node.id === parentId) {
       if (!node.children?.length) return null;
-      return [...node.children].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+      return [...node.children].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
     }
     node.children?.forEach((child) => stack.push(child));
   }
@@ -421,7 +427,8 @@ function EmptyState() {
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-slate-500">
       <p className="text-base font-medium text-slate-700">No menu items yet</p>
       <p className="max-w-sm text-sm">
-        Create a new menu item using the blue buttons in the tree to start building your navigation hierarchy.
+        Create a new menu item using the blue buttons in the tree to start
+        building your navigation hierarchy.
       </p>
     </div>
   );
@@ -431,7 +438,10 @@ function LoadingState() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-10 animate-pulse rounded-xl bg-slate-100" />
+        <div
+          key={index}
+          className="h-10 animate-pulse rounded-xl bg-slate-100"
+        />
       ))}
     </div>
   );
