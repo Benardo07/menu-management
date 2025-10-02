@@ -220,7 +220,7 @@ export function MenusScreen({}: MenusScreenProps = {}) {
     ) {
       return "/";
     }
-    return `/${breadcrumbItem.title}`;
+    return `/ ${breadcrumbItem.title}`;
   }, [breadcrumbItem]);
 
   const handleMenuChange = (event: ChangeEvent<HTMLSelectElement>) => {
