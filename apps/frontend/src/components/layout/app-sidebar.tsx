@@ -14,6 +14,7 @@ import { useAppDispatch, useAppSelector } from "@/lib/redux/hooks";
 import { selectItem } from "@/lib/redux/slices/menu-slice";
 import type { MenuTreeNode } from "@/lib/redux/slices/menu-slice";
 import { useSidebar } from "@/contexts/sidebar-context";
+import { SubmenuIcon } from "../icons/submenu-icon";
 
 interface AppSidebarProps {
   mobileOpen?: boolean;
@@ -229,6 +230,7 @@ export function AppSidebar({
                   <ul className="mt-2 space-y-1 px-2 pb-3 text-sm text-[#667085]">
                     {group.children.map((child) => {
                       const isActiveChild = selectedItemId === child.id;
+                      const iconColor = isActiveChild ? "#000000" : "none";
                       return (
                         <li key={child.id}>
                           <button
@@ -241,12 +243,10 @@ export function AppSidebar({
                                 : "text-[#667085] hover:bg-white/10 hover:text-white"
                             )}
                           >
-                            <Image
-                              src={SUBMENU_ICON}
-                              alt="Sub menu"
-                              width={24}
-                              height={24}
-                            />
+                            <SubmenuIcon
+                              className="h-6 w-6"
+                              fill={iconColor}
+                            ></SubmenuIcon>
                             <span className="truncate font-bold text-[14px]">
                               {child.title}
                             </span>
